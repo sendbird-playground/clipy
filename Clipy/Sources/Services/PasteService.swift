@@ -147,9 +147,11 @@ extension PasteService {
             return
         }
 
-        let vKeyCode = Sauce.shared.keyCode(by: .v)
-        DispatchQueue.main.async {
-            let source = CGEventSource(stateID: .combinedSessionState)
+        let vKeyCode = Sauce.shared.keyCode(for: .v)
+        NSApp.hide(nil)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            let source = CGEventSource(stateID: .hidSystemState)
             // Disable local keyboard events while pasting
             source?.setLocalEventsFilterDuringSuppressionState([.permitLocalMouseEvents, .permitSystemDefinedEvents], state: .eventSuppressionStateSuppressionInterval)
             // Press Command + V
