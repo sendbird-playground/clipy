@@ -58,6 +58,62 @@ extension Realm {
             }
         })
         Realm.Configuration.defaultConfiguration = config
-        _ = try! Realm()
+        openRealmOrResetIncompatibleStore(using: config)
+    }
+
+    private static func openRealmOrResetIncompatibleStore(using config: Realm.Configuration) {
+        do {
+            _ = try Realm()
+        } catch {
+            guard shouldResetStore(for: error), let fileURL = config.fileURL else {
+                fatalError("Failed to open Realm: \(error)")
+            }
+
+            do {
+                try backupIncompatibleStore(at: fileURL)
+                _ = try Realm()
+            } catch {
+                fatalError("Failed to recover incompatible Realm store: \(error)")
+            }
+        }
+    }
+
+    private static func shouldResetStore(for error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == "io.realm" && nsError.code == 16
+    }
+
+    private static func backupIncompatibleStore(at fileURL: URL) throws {
+        let fileManager = FileManager.default
+        let baseDirectory = fileURL.deletingLastPathComponent()
+        let backupsDirectory = baseDirectory.appendingPathComponent("RealmBackups", isDirectory: true)
+        try fileManager.createDirectory(at: backupsDirectory, withIntermediateDirectories: true)
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let timestamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let backupDirectory = backupsDirectory.appendingPathComponent("incompatible-\(timestamp)", isDirectory: true)
+        try fileManager.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+
+        let relatedURLs = [
+            fileURL,
+            fileURL.appendingPathExtension("lock"),
+            fileURL.appendingPathExtension("note"),
+            fileURL.appendingPathExtension("management"),
+            fileURL.appendingPathExtension("backup-log")
+        ]
+
+        for relatedURL in relatedURLs {
+            guard fileManager.fileExists(atPath: relatedURL.path) else { continue }
+            let destinationURL = backupDirectory.appendingPathComponent(relatedURL.lastPathComponent, isDirectory: false)
+
+            do {
+                try fileManager.moveItem(at: relatedURL, to: destinationURL)
+            } catch {
+                if relatedURL == fileURL {
+                    throw error
+                }
+            }
+        }
     }
 }
