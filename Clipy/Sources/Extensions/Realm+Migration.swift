@@ -78,7 +78,7 @@ extension Realm {
         }
     }
 
-    private static func shouldResetStore(for error: Error) -> Bool {
+    private static func shouldResetStore(for error: Swift.Error) -> Bool {
         let nsError = error as NSError
         return nsError.domain == "io.realm" && nsError.code == 16
     }
