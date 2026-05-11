@@ -34,6 +34,7 @@ platform :mac do
     output_name = options[:output_name] || ENV.fetch("OUTPUT_NAME", "Clipy-AppleSilicon")
     build_dir = File.join(PROJECT_ROOT, "build")
     derived_data_path = File.join(build_dir, "DerivedData")
+    archive_path = File.join(build_dir, "Clipy.xcarchive")
     release_app_path = File.join(build_dir, "#{output_name}.app")
     release_dmg_path = File.join(build_dir, "#{output_name}.dmg")
     signing_identity = ENV["SIGNING_IDENTITY"].to_s.strip
@@ -48,13 +49,15 @@ platform :mac do
         -scheme Clipy \
         -configuration Release \
         -derivedDataPath #{Shellwords.escape(derived_data_path)} \
+        -archivePath #{Shellwords.escape(archive_path)} \
         -destination 'generic/platform=macOS' \
+        SKIP_INSTALL=NO \
         CODE_SIGNING_ALLOWED=NO \
         CODE_SIGNING_REQUIRED=NO \
-        clean build
+        clean archive
     SH
 
-    built_app_path = File.join(derived_data_path, "Build", "Products", "Release", "Clipy.app")
+    built_app_path = File.join(archive_path, "Products", "Applications", "Clipy.app")
     UI.user_error!("Expected build product not found at #{built_app_path}") unless File.directory?(built_app_path)
 
     sh "ditto #{Shellwords.escape(built_app_path)} #{Shellwords.escape(release_app_path)}"
