@@ -1,5 +1,8 @@
-platform :osx, '10.10'
+require 'shellwords'
+
+platform :osx, '10.13'
 use_frameworks!
+inhibit_all_warnings!
 
 target 'Clipy' do
 
@@ -7,7 +10,7 @@ target 'Clipy' do
   pod 'PINCache'
   pod 'Sauce'
   pod 'Sparkle'
-  pod 'RealmSwift'
+  pod 'RealmSwift', '~> 10.0'
   pod 'RxCocoa'
   pod 'RxSwift'
   pod 'LoginServiceKit', :git => 'https://github.com/Clipy/LoginServiceKit.git'
@@ -30,4 +33,24 @@ target 'Clipy' do
 
   end
 
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '10.13'
+
+      ldflags = config.build_settings['OTHER_LDFLAGS']
+      next if ldflags.nil?
+
+      values = ldflags.is_a?(Array) ? ldflags : Shellwords.split(ldflags.to_s)
+      config.build_settings['OTHER_LDFLAGS'] = values.uniq
+    end
+
+    target.shell_script_build_phases.each do |phase|
+      next unless phase.name == 'Create Symlinks to Header Folders'
+
+      phase.always_out_of_date = '1'
+    end
+  end
 end
