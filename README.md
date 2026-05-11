@@ -2,6 +2,10 @@
   <img src="./Resources/clipy_logo.png" width="400">
 </div>
 
+> [!NOTE]
+> This fork includes Apple Silicon compatibility updates and GitHub release packaging.
+> Release artifacts built from this repository are unofficial and not affiliated with the original Clipy project.
+
 <br>
 
 ![CI](https://github.com/Clipy/Clipy/workflows/CI/badge.svg)
@@ -13,22 +17,27 @@ Clipy is a Clipboard extension app for macOS.
 
 ---
 
-__Requirement__: macOS 10.10 Yosemite or higher
+__Requirement__: macOS 10.13 High Sierra or higher
 
 __Distribution Site__ : <https://clipy-app.com>
 
 <img src="http://clipy-app.com/img/screenshot1.png" width="400">
 
 ### Development Environment
-* macOS 10.15 Catalina
-* Xcode 12.2
-* Swift 5.3
+* macOS 14 or higher recommended
+* Xcode 15 or higher recommended
+* Swift 5
 
 ### How to Build
 0. Move to the project root directory
 1. `bundle install --path=vendor/bundle && bundle exec pod install`
 2. Open `Clipy.xcworkspace` on Xcode.
 3. build.
+
+### Package For GitHub Releases
+1. `bundle exec fastlane build_dmg`
+2. Find the packaged DMG at `build/Clipy-AppleSilicon.dmg`
+3. Push a `v*` tag to trigger the GitHub Actions release workflow
 
 ### Contributing
 1. Fork it ( https://github.com/Clipy/Clipy/fork )

@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+  ENABLE_BARTY_CROUCH: NO
+
+jobs:
+  package:
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "2.6"
+          bundler: 2.4.22
+          bundler-cache: true
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Pod install
+        run: bundle exec pod install
+
+      - name: Build DMG
+        run: bundle exec fastlane build_dmg
+        env:
+          OUTPUT_NAME: Clipy-AppleSilicon
+          SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Clipy-AppleSilicon
+          path: build/Clipy-AppleSilicon.dmg
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/Clipy-AppleSilicon.dmg
+          generate_release_notes: true

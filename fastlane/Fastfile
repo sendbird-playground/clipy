@@ -1,3 +1,5 @@
+require 'shellwords'
+
 default_platform :mac
 
 platform :mac do
@@ -11,22 +13,7 @@ platform :mac do
 
   desc "Setup development"
   lane :setup do
-  end
-
-  desc "Setup release developer id account settings. (only use admin)"
-  lane :setup_release_id do
-    # Update Project Team
-    update_project_team(
-      path: "Clipy.xcodeproj",
-      teamid: "BBCHAJ584H"
-    )
-    # Update Provisioning Profile
-    update_provisioning_profile_specifier(
-      xcodeproj: "Clipy.xcodeproj",
-      new_specifier: "ClipyDistribution",
-      configuration: "Release",
-      target: "^Clipy$"
-    )
+    sh "bundle exec pod install"
   end
 
   ####################### PUBLIC LANES ########################
@@ -35,11 +22,41 @@ platform :mac do
   lane :test do
     scan_clipy
   end
-  
-  desc "Release"
-  lane :release do
-    # TODO: Use :codesigning_identity options (Developer ID Application: Shunsuke Furubayashi (BBCHAJ584H))
-    # TODO: Use :export_method options (developer-id)
+
+  desc "Build a DMG suitable for GitHub releases"
+  lane :build_dmg do |options|
+    output_name = options[:output_name] || ENV.fetch("OUTPUT_NAME", "Clipy-AppleSilicon")
+    build_dir = File.expand_path("../build", __dir__)
+    derived_data_path = File.join(build_dir, "DerivedData")
+    release_app_path = File.join(build_dir, "#{output_name}.app")
+    release_dmg_path = File.join(build_dir, "#{output_name}.dmg")
+    signing_identity = ENV["SIGNING_IDENTITY"].to_s.strip
+    signing_identity = "-" if signing_identity.empty?
+
+    sh "rm -rf #{Shellwords.escape(build_dir)}"
+    sh "mkdir -p #{Shellwords.escape(build_dir)}"
+    sh <<~SH
+      set -euo pipefail
+      xcodebuild \
+        -workspace Clipy.xcworkspace \
+        -scheme Clipy \
+        -configuration Release \
+        -derivedDataPath #{Shellwords.escape(derived_data_path)} \
+        -destination 'generic/platform=macOS' \
+        CODE_SIGNING_ALLOWED=NO \
+        CODE_SIGNING_REQUIRED=NO \
+        clean build
+    SH
+
+    built_app_path = File.join(derived_data_path, "Build", "Products", "Release", "Clipy.app")
+    UI.user_error!("Expected build product not found at #{built_app_path}") unless File.directory?(built_app_path)
+
+    sh "ditto #{Shellwords.escape(built_app_path)} #{Shellwords.escape(release_app_path)}"
+    sh "/usr/bin/codesign --force --deep --sign #{Shellwords.escape(signing_identity)} --entitlements #{Shellwords.escape('Clipy/Clipy.entitlements')} #{Shellwords.escape(release_app_path)}"
+    sh "rm -f #{Shellwords.escape(release_dmg_path)}"
+    sh "/usr/bin/hdiutil create -volname #{Shellwords.escape(output_name)} -srcfolder #{Shellwords.escape(release_app_path)} -ov -format UDZO #{Shellwords.escape(release_dmg_path)}"
+
+    UI.message("DMG created at #{release_dmg_path}")
   end
 
   ####################### PRIVATE LANES ########################
@@ -48,7 +65,6 @@ platform :mac do
     scan(
       workspace: "Clipy.xcworkspace",
       scheme: "Clipy",
-      skip_build: true,
       verbose: true,
       clean: true
     )
