@@ -1,5 +1,9 @@
 require 'shellwords'
 
+PROJECT_ROOT = File.expand_path("..", __dir__)
+WORKSPACE_PATH = File.join(PROJECT_ROOT, "Clipy.xcworkspace")
+ENTITLEMENTS_PATH = File.join(PROJECT_ROOT, "Clipy", "Clipy.entitlements")
+
 default_platform :mac
 
 platform :mac do
@@ -13,7 +17,9 @@ platform :mac do
 
   desc "Setup development"
   lane :setup do
-    sh "bundle exec pod install"
+    Dir.chdir(PROJECT_ROOT) do
+      sh "bundle exec pod install"
+    end
   end
 
   ####################### PUBLIC LANES ########################
@@ -26,7 +32,7 @@ platform :mac do
   desc "Build a DMG suitable for GitHub releases"
   lane :build_dmg do |options|
     output_name = options[:output_name] || ENV.fetch("OUTPUT_NAME", "Clipy-AppleSilicon")
-    build_dir = File.expand_path("../build", __dir__)
+    build_dir = File.join(PROJECT_ROOT, "build")
     derived_data_path = File.join(build_dir, "DerivedData")
     release_app_path = File.join(build_dir, "#{output_name}.app")
     release_dmg_path = File.join(build_dir, "#{output_name}.dmg")
@@ -38,7 +44,7 @@ platform :mac do
     sh <<~SH
       set -euo pipefail
       xcodebuild \
-        -workspace Clipy.xcworkspace \
+        -workspace #{Shellwords.escape(WORKSPACE_PATH)} \
         -scheme Clipy \
         -configuration Release \
         -derivedDataPath #{Shellwords.escape(derived_data_path)} \
@@ -52,7 +58,7 @@ platform :mac do
     UI.user_error!("Expected build product not found at #{built_app_path}") unless File.directory?(built_app_path)
 
     sh "ditto #{Shellwords.escape(built_app_path)} #{Shellwords.escape(release_app_path)}"
-    sh "/usr/bin/codesign --force --deep --sign #{Shellwords.escape(signing_identity)} --entitlements #{Shellwords.escape('Clipy/Clipy.entitlements')} #{Shellwords.escape(release_app_path)}"
+    sh "/usr/bin/codesign --force --deep --sign #{Shellwords.escape(signing_identity)} --entitlements #{Shellwords.escape(ENTITLEMENTS_PATH)} #{Shellwords.escape(release_app_path)}"
     sh "rm -f #{Shellwords.escape(release_dmg_path)}"
     sh "/usr/bin/hdiutil create -volname #{Shellwords.escape(output_name)} -srcfolder #{Shellwords.escape(release_app_path)} -ov -format UDZO #{Shellwords.escape(release_dmg_path)}"
 
@@ -63,7 +69,7 @@ platform :mac do
 
   private_lane :scan_clipy do
     scan(
-      workspace: "Clipy.xcworkspace",
+      workspace: WORKSPACE_PATH,
       scheme: "Clipy",
       verbose: true,
       clean: true
